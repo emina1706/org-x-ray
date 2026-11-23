@@ -1,0 +1,66 @@
+<apex:page controller="OrgXRayReportController" renderAs="pdf" showHeader="false" sidebar="false"
+           standardStylesheets="false" applyHtmlTag="false" applyBodyTag="false">
+<html>
+<head>
+    <title>Org X-Ray report</title>
+    <style type="text/css">
+        @page { size: A4; margin: 18mm 16mm; @bottom-center { content: "Page " counter(page) " of " counter(pages); font-size: 8pt; color: #7a6f63; } }
+        body { font-family: 'Arial Unicode MS', Arial, sans-serif; font-size: 10pt; color: #3a2e25; }
+        .eyebrow { font-size: 8pt; letter-spacing: 1px; color: #2a7f78; text-transform: uppercase; margin: 0; }
+        h1 { font-size: 20pt; margin: 4pt 0 2pt; }
+        .meta { color: #7a6f63; font-size: 9pt; margin: 0 0 12pt; }
+        .score { background: #f5e9d7; padding: 10pt 12pt; margin-bottom: 12pt; }
+        .score strong { font-size: 24pt; }
+        .warn { color: #b0532f; }
+        h2 { font-size: 12pt; border-bottom: 1px solid #e0d5c5; padding-bottom: 3pt; margin: 14pt 0 5pt; page-break-after: avoid; }
+        p { margin: 0 0 5pt; }
+        table { width: 100%; border-collapse: collapse; }
+        td { padding: 3pt 0; border-bottom: 1px solid #f0e8db; vertical-align: top; }
+        td.name { width: 38%; font-weight: bold; padding-right: 8pt; }
+        tr { page-break-inside: avoid; }
+        .effort { font-weight: normal; font-size: 8pt; color: #7a6f63; }
+        .foot { margin-top: 16pt; color: #7a6f63; font-size: 8pt; }
+    </style>
+</head>
+<body>
+    <p class="eyebrow">Org X-Ray · by Virago</p>
+    <h1>{!orgName}</h1>
+    <p class="meta">Generated {!generatedOn}. Read-only scan: nothing was changed and nothing left Salesforce.</p>
+
+    <apex:outputPanel layout="block" styleClass="score" rendered="{!NOT(ISBLANK(score))}">
+        <strong>{!score}</strong> / 100 · {!tier}
+    </apex:outputPanel>
+    <apex:outputPanel layout="none" rendered="{!failedCount > 0}">
+        <p class="warn">{!failedCount} of the checks in this report could not run, so it is incomplete.</p>
+    </apex:outputPanel>
+
+    <apex:outputPanel layout="none" rendered="{!hasFixFirst}">
+        <h2>Fix these first</h2>
+        <table>
+            <apex:repeat value="{!fixFirst}" var="f">
+                <tr><td class="name">{!f.title}<br/><span class="effort">{!f.effort}</span></td><td>{!f.how}</td></tr>
+            </apex:repeat>
+        </table>
+    </apex:outputPanel>
+
+    <apex:repeat value="{!sections}" var="s">
+        <h2>{!s.title}</h2>
+        <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(s.error))}">
+            <p class="warn">Couldn't run this check: {!s.error}</p>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!NOT(ISBLANK(s.summary))}">
+            <p>{!s.summary}</p>
+        </apex:outputPanel>
+        <apex:outputPanel layout="none" rendered="{!s.hasRows}">
+            <table>
+                <apex:repeat value="{!s.rows}" var="r">
+                    <tr><td class="name">{!r.name}</td><td>{!r.detail}</td></tr>
+                </apex:repeat>
+            </table>
+        </apex:outputPanel>
+    </apex:repeat>
+
+    <p class="foot">Scanned with Org X-Ray by Virago · getvirago.com</p>
+</body>
+</html>
+</apex:page>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<PermissionSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <label>Org X-Ray</label>
+    <description>Gives access to the Org X-Ray tab and the Apex class behind it.</description>
+    <hasActivationRequired>false</hasActivationRequired>
+    <classAccesses>
+        <apexClass>OrgXRayController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>OrgXRayReportController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <classAccesses>
+        <apexClass>OrgXRayExportController</apexClass>
+        <enabled>true</enabled>
+    </classAccesses>
+    <pageAccesses>
+        <apexPage>OrgXRayExport</apexPage>
+        <enabled>true</enabled>
+    </pageAccesses>
+    <pageAccesses>
+        <apexPage>OrgXRayReport</apexPage>
+        <enabled>true</enabled>
+    </pageAccesses>
+    <tabSettings>
+        <tab>Org_X_Ray</tab>
+        <visibility>Visible</visibility>
+    </tabSettings>
+</PermissionSet>

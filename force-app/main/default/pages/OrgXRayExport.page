@@ -1,0 +1,2 @@
+<apex:page controller="OrgXRayExportController" contentType="text/csv#{!fileName}" showHeader="false" sidebar="false"
+           standardStylesheets="false" applyHtmlTag="false" applyBodyTag="false"><apex:outputText value="{!csv}" escape="false"/></apex:page>

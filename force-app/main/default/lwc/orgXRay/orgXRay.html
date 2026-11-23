@@ -1,0 +1,283 @@
+<template>
+    <div class="xr">
+        <header class="xr-head">
+            <div class="xr-title">
+                <p class="eyebrow">Org X-Ray · by Virago</p>
+                <h1>How healthy is this Salesforce org?</h1>
+                <p class="sub">Runs inside your org and only reads data. Nothing is changed and nothing leaves Salesforce.</p>
+            </div>
+            <div class="controls">
+                <button class="xr-btn" onclick={run} disabled={running}>{runLabel}</button>
+            </div>
+        </header>
+
+        <template lwc:if={showIntro}>
+            <section class="intro">
+                <h2>What the X-Ray checks</h2>
+                <ul class="checks">
+                    <li><strong>Licenses you pay for but nobody uses.</strong> Active users with no login in 90 days, turned into money per year.</li>
+                    <li><strong>Old automation.</strong> Process Builders that Salesforce no longer supports, objects with more than one trigger and code on very old API versions.</li>
+                    <li><strong>Lead sources that went quiet.</strong> Sources that used to send leads every day and suddenly stopped or dropped.</li>
+                    <li><strong>Admin access.</strong> Everyone who can change all data, and how they got that access.</li>
+                    <li><strong>Unused fields.</strong> Custom fields on your main objects and your largest custom objects that are almost never filled in.</li>
+                    <li><strong>Duplicate rules.</strong> Whether Leads, Contacts and Accounts are protected against duplicates.</li>
+                    <li><strong>Storage and API use.</strong> How close the org is to its data, file and API limits.</li>
+                    <li><strong>Failed background jobs.</strong> Scheduled and batch jobs that failed in the last 7 days.</li>
+                    <li><strong>Forgotten records.</strong> Deals past their close date, records owned by inactive users and reports nobody runs.</li>
+                    <li><strong>Security.</strong> Who holds powerful permissions, what guest users can change and how many logins failed.</li>
+                    <li><strong>Data quality.</strong> Contacts without an email, accounts without a contact and records nobody has touched in two years.</li>
+                </ul>
+                <p class="fine">Takes about a minute. Run it as a System Administrator for complete results.</p>
+            </section>
+        </template>
+
+        <template lwc:if={running}>
+            <section class="progress">
+                <template for:each={steps} for:item="s">
+                    <div key={s.key} class={s.cls}>
+                        <lightning-icon icon-name={s.icon} size="x-small" alternative-text={s.state}></lightning-icon>
+                        <span>{s.label}</span>
+                    </div>
+                </template>
+            </section>
+        </template>
+
+        <template lwc:if={hasResult}>
+            <section class="score-card">
+                <div class="ring" style="width:168px;height:168px">
+                    <svg width={ringSize} height={ringSize} viewBox={ringViewBox} aria-hidden="true">
+                        <circle class="ring-track" cx={ringCenter} cy={ringCenter} r={ringRadius} fill="none" stroke-width={ringStroke}></circle>
+                        <circle class="ring-val" cx={ringCenter} cy={ringCenter} r={ringRadius} fill="none" stroke-width={ringStroke}
+                            stroke-linecap="round" transform={ringTransform} style={ringValStyle}></circle>
+                    </svg>
+                    <div class="ring-num"><span>{score}</span><small>/ 100</small></div>
+                </div>
+                <div class="score-text">
+                    <p class="eyebrow">Org score</p>
+                    <h2>{tier.name}</h2>
+                    <p>{tier.text}</p>
+                    <template lwc:if={partialNote}><p class="err">{partialNote}</p></template>
+                </div>
+            </section>
+
+            <section class="tiles">
+                <template for:each={tiles} for:item="t">
+                    <div key={t.key} class={t.cls}>
+                        <span class="tile-value">{t.value}</span>
+                        <span class="tile-label">{t.label}</span>
+                        <span class="tile-sub">{t.sub}</span>
+                    </div>
+                </template>
+            </section>
+
+            <div class="sections">
+                <template lwc:if={hasFixFirst}>
+                    <section class="block wide">
+                        <h3>Fix these first</h3>
+                        <p class="hint">The biggest wins for the least effort. Points show how much each fix adds to the score.</p>
+                        <ul class="rows">
+                            <template for:each={fixFirst} for:item="f">
+                                <li key={f.key}>
+                                    <span class="row-name">{f.title} <span class={f.pillCls}>{f.pill}</span></span>
+                                    <span class="row-detail">{f.how}</span>
+                                </li>
+                            </template>
+                        </ul>
+                    </section>
+                </template>
+
+                <section class="block">
+                    <h3>Licenses nobody uses</h3>
+                    <template lwc:if={licensesError}><p class="err">Couldn't run this check: {licensesError}</p></template>
+                    <template lwc:else>
+                        <template lwc:if={isSandbox}>
+                            <p class="err">This is a sandbox. People rarely log in here, so run the X-Ray in production to see real license use. These users don't affect the score.</p>
+                        </template>
+                        <template lwc:else>
+                            <p class="hint">Enter what you pay per month in USD for each license type. Salesforce doesn't share your contract prices with the org. Integration and agent users are not counted.</p>
+                            <ul class="rows">
+                                <template for:each={licenseRows} for:item="l">
+                                    <li key={l.key}>
+                                        <span class="row-name">{l.name}</span>
+                                        <span class="row-detail">{l.detail}</span>
+                                        <lightning-input
+                                            class="price"
+                                            type="number"
+                                            label="Price per license / month (USD)"
+                                            value={l.price}
+                                            min="0"
+                                            data-license={l.key}
+                                            onchange={handlePrice}
+                                        ></lightning-input>
+                                    </li>
+                                </template>
+                            </ul>
+                        </template>
+                        <p class="hint">Check each user before you deactivate them. <a href={usersCsvUrl} target="_blank" rel="noopener">Download the list (CSV)</a></p>
+                        <ul class="rows">
+                            <template for:each={inactiveUsers} for:item="u">
+                                <li key={u.key}><span class="row-name">{u.name}</span><span class="row-detail">{u.detail}</span></li>
+                            </template>
+                        </ul>
+                        <p class="more">{inactiveMore}</p>
+                    </template>
+                </section>
+
+                <section class="block">
+                    <h3>Lead sources</h3>
+                    <template lwc:if={leadFlowError}><p class="err">Couldn't run this check: {leadFlowError}</p></template>
+                    <template lwc:elseif={hasLeadSources}>
+                        <ul class="rows">
+                            <template for:each={leadSources} for:item="s">
+                                <li key={s.key}>
+                                    <span class="row-name">{s.name} <span class={s.pillCls}>{s.pill}</span></span>
+                                    <span class="row-detail">{s.detail}</span>
+                                </li>
+                            </template>
+                        </ul>
+                    </template>
+                    <template lwc:else><p class="hint">{leadFlowHint}</p></template>
+                </section>
+
+                <section class="block">
+                    <h3>Old automation and code</h3>
+                    <template lwc:if={automationError}><p class="err">Couldn't run this check: {automationError}</p></template>
+                    <template lwc:else>
+                        <p class="hint">{automationSummary}</p>
+                        <ul class="rows">
+                            <template for:each={legacyList} for:item="p">
+                                <li key={p.key}><span class="row-name">{p.name}</span><span class="row-detail">{p.detail}</span></li>
+                            </template>
+                            <template for:each={multiTriggerList} for:item="m">
+                                <li key={m.key}><span class="row-name">{m.name}</span><span class="row-detail">{m.detail}</span></li>
+                            </template>
+                        </ul>
+                        <p class="more">{legacyMore}</p>
+                        <p class="fine">Workflow Rules aren't counted yet. Salesforce only exposes them through the Tooling API.</p>
+                    </template>
+                </section>
+
+                <section class="block">
+                    <h3>Who can change everything</h3>
+                    <template lwc:if={accessError}><p class="err">Couldn't run this check: {accessError}</p></template>
+                    <template lwc:else>
+                        <p class="hint">{accessSummary}</p>
+                        <ul class="rows">
+                            <template for:each={adminUsers} for:item="a">
+                                <li key={a.key}><span class="row-name">{a.name}</span><span class="row-detail">{a.detail}</span></li>
+                            </template>
+                        </ul>
+                    </template>
+                </section>
+
+                <section class="block">
+                    <h3>Duplicate rules</h3>
+                    <template lwc:if={duplicatesError}><p class="err">Couldn't run this check: {duplicatesError}</p></template>
+                    <template lwc:else>
+                        <ul class="rows">
+                            <template for:each={dupRows} for:item="d">
+                                <li key={d.key}><span class="row-name">{d.name} <span class={d.pillCls}>{d.pill}</span></span></li>
+                            </template>
+                        </ul>
+                    </template>
+                </section>
+
+                <section class="block">
+                    <h3>Security</h3>
+                    <template lwc:if={securityError}><p class="err">Couldn't run this check: {securityError}</p></template>
+                    <template lwc:else>
+                        <ul class="rows">
+                            <template for:each={securityRows} for:item="r">
+                                <li key={r.key}><span class="row-name">{r.name}</span><span class="row-detail">{r.detail}</span></li>
+                            </template>
+                        </ul>
+                    </template>
+                </section>
+
+                <section class="block">
+                    <h3>Data quality</h3>
+                    <template lwc:if={dataQualityError}><p class="err">Couldn't run this check: {dataQualityError}</p></template>
+                    <template lwc:else>
+                        <ul class="rows">
+                            <template for:each={dataQualityRows} for:item="r">
+                                <li key={r.key}><span class="row-name">{r.name}</span><span class="row-detail">{r.detail}</span></li>
+                            </template>
+                        </ul>
+                    </template>
+                </section>
+
+                <section class="block">
+                    <h3>Storage and API use</h3>
+                    <template lwc:if={limitsError}><p class="err">Couldn't run this check: {limitsError}</p></template>
+                    <template lwc:else>
+                        <ul class="rows">
+                            <template for:each={limitRows} for:item="l">
+                                <li key={l.key}>
+                                    <span class="row-name">{l.name} <span class={l.pillCls}>{l.pill}</span></span>
+                                    <span class="row-detail">{l.detail}</span>
+                                </li>
+                            </template>
+                        </ul>
+                    </template>
+                </section>
+
+                <section class="block">
+                    <h3>Failed background jobs</h3>
+                    <template lwc:if={jobsError}><p class="err">Couldn't run this check: {jobsError}</p></template>
+                    <template lwc:elseif={hasJobRows}>
+                        <ul class="rows">
+                            <template for:each={jobRows} for:item="j">
+                                <li key={j.key}><span class="row-name">{j.name}</span><span class="row-detail">{j.detail}</span></li>
+                            </template>
+                        </ul>
+                    </template>
+                    <template lwc:else><p class="hint">No background jobs failed in the last 7 days.</p></template>
+                </section>
+
+                <section class="block">
+                    <h3>Forgotten records and reports</h3>
+                    <template lwc:if={staleDataError}><p class="err">Couldn't run this check: {staleDataError}</p></template>
+                    <template lwc:else>
+                        <ul class="rows">
+                            <template for:each={staleRows} for:item="s">
+                                <li key={s.key}><span class="row-name">{s.name}</span><span class="row-detail">{s.detail}</span></li>
+                            </template>
+                        </ul>
+                    </template>
+                </section>
+
+                <section class="block wide">
+                    <h3>Fields almost nobody fills in</h3>
+                    <p class="hint"><a href={fieldsCsvUrl} target="_blank" rel="noopener">Download the list (CSV)</a></p>
+                    <div class="field-groups">
+                        <template for:each={fieldGroups} for:item="g">
+                            <div key={g.key} class="field-group">
+                                <h4>{g.title}</h4>
+                                <template lwc:if={g.error}><p class="err">Couldn't run this check: {g.error}</p></template>
+                                <template lwc:else>
+                                    <p class="hint">{g.summary}</p>
+                                    <ul class="rows compact">
+                                        <template for:each={g.rows} for:item="f">
+                                            <li key={f.key}><span class="row-name">{f.name}</span><span class="row-detail">{f.detail}</span></li>
+                                        </template>
+                                    </ul>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+            </div>
+
+            <section class="cta">
+                <div>
+                    <h2>Want help fixing this?</h2>
+                    <p>Book a free 20-minute call with Virago. We'll go through these results together and agree on what to fix first.</p>
+                </div>
+                <div class="cta-actions">
+                    <a class="xr-btn" href={bookingUrl} target="_blank" rel="noopener">Book a free call</a>
+                    <a class="xr-btn ghost" href={pdfUrl} target="_blank" rel="noopener">Open PDF report</a>
+                </div>
+            </section>
+        </template>
+    </div>
+</template>

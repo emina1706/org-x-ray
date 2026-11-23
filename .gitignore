@@ -1,0 +1,15 @@
+# Salesforce CLI local state
+.sf/
+.sfdx/
+.localdevserver/
+deploy-options.json
+
+# Editors and OS
+.vscode/
+.idea/
+*.log
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
